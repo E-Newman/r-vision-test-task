@@ -1,0 +1,72 @@
+== Working with active lists
+[#working-with-active-lists]
+
+In order to use the active lists data for enrichment or filtering the results of the events storage query, the `JOIN` operator shall be used. AQL supports `INNER JOIN, LEFT JOIN, RIGHT JOIN` and `FULL JOIN`. In `JOIN`, the events storage always acts as a left table, and the active list as the right one.
+
+Example:
+
+The following query returns events only for the IP addresses involved in DDoS attacks.
+
+[source,sql]
+----
+SELECT * FROM event INNER JOIN DDoSAttackIPs ON event.sourceIp = DDoSAttackIPs.Ip
+----
+
+Query in the system:
+
+[source,sql]
+----
+INNER JOIN DDoSAttackIPs ON event.sourceIp = DDoSAttackIPs.Ip
+----
+
+This example uses `INNER JOIN`, a type of `JOIN` that returns only records that have matching values both in the events storage and in the active list; in the example, only the records corresponding to IP addresses that both generated the events and were involved in DDoS attacks are returned.
+
+TIP: For the columns, both syntax {table_name}.{column_name} and {column_name} can be used.
+
+{column_name} usage example:
+
+[source,sql]
+----
+INNER JOIN DDoSAttackIPs ON sourceIp = Ip
+----
+
+IMPORTANT: In AQL, explicit `JOIN` type specification is required; unlike other SQL query languages, `INNER` *is not* a default type.
+
+With `LEFT JOIN`, the query returns all the records from the events storage and only the records from the active list that fulfil the condition set in the `ON` section. If the active list contains no records that match the records from the events storage, the fields for active list data will be filled with `NULL`.
+
+Example:
+
+The following query adds the IP address description for addresses from the whitelist in complement to the event information. For non-whitelisted IPs, the `description` field will be `NULL`.
+
+[source,sql]
+----
+SELECT event.sourceIp, event.art, event.raw, wl.description LEFT JOIN whitelist_ips AS wl ON event.sourceIp = wl.Ip
+----
+
+TIP: Instead of active list name, its alias set in `AS` section can be used.
+
+With `RIGHT JOIN`, the query returns all the records from the active list and only the records from the events storage that fulfil the condition set in the `ON` section. If the events storage contains no records that match the records from the active list, the fields for events storage data will be filled with `NULL`.
+
+Example:
+
+The following query returns the list of suspicious IPs, timestamps and text of their activity start events. For suspicious IPs that were inactive, the fields `art` and `raw` will be `NULL`.
+
+[source,sql]
+----
+SELECT sl.Ip, event.art, event.raw RIGHT JOIN suspicious_ips AS sl ON event.sourceIp = sl.Ip AND event.art = sl.activity_started_ts
+----
+
+TIP: The `ON` section supports composite conditions that include arithmetic comparison and logical `AND` and `OR` operations, for example, `event.col1 = al.col2 AND event.col3 > al.col4 OR event.col5 < al.col6`
+
+With `FULL JOIN`, the query returns all the records from the events storage and active list. If there are no records that fulfil the condition set in the `ON` section in the events storage or active list, the corresponding fields will be filled with `NULL`.
+
+Example:
+
+The following query returns the description of events with `Warning` prefix since 2024.05.23 00:00:00: IPs, timestamps and event text messages. For the IPs from `DDoSAttackIPs` and `ParserIPs` active lists, their text description is additionally returned.
+
+[source,sql]
+----
+SELECT event.sourceIp, event.art, event.raw, bl_ddos.description, bl_pars.description WHERE event.timestamp >= '2024-05-23 00:00:00' AND event.raw LIKE 'Warning%' FULL JOIN DDoSAttackIPs AS bl_ddos ON event.sourceIp = bl_ddos.Ip FULL JOIN ParserIPs as bl_pars ON event.sourceIp = bl_pars.Ip
+----
+
+TIP: The query above illustrates the support of multiple `JOIN` operators in one query, which allows joining the data from multiple active lists.
